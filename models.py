@@ -10,6 +10,7 @@ class Item(Base):
     price=Column(Integer)
     available=Column(Boolean,default=True)
     image_url=Column(String)
+    category_id=Column(Integer, ForeignKey('categories.id'))
     options = relationship("Option", back_populates="item")
     category=relationship("Category", back_populates="items")
 
