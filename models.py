@@ -18,6 +18,7 @@ class Item(Base):
 class Option(Base):
     __tablename__ = 'options'
     id=Column(Integer, primary_key=True,index=True)
+    name= name=Column(String)
     price=Column(Integer)
     item_id=Column(Integer, ForeignKey('items.id'))
     item=relationship("Item", back_populates="options")
