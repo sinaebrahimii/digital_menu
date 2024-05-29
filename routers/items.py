@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException,Depends,Path
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import Annotated,Union
+from typing import Annotated,Union,List
 from starlette import status
 from models import Item,Category,Option
 from database import SessionLocal
@@ -29,6 +29,15 @@ class OptionRequest(BaseModel):
     name:str
     price:int
 
+
+class OptionResponse(BaseModel):
+    id:Union[int,None]=None
+    item_id:int
+    name:str
+    price:int
+    class Config:
+        from_attributes = True
+
 class ItemResponse(BaseModel):
     id:Union[int,None]=None
     name:str
@@ -36,14 +45,22 @@ class ItemResponse(BaseModel):
     available:bool
     image_url:Union[str,None]=None
     category_id:int
+    options:List[OptionResponse]
+    class Config:
+        from_attributes = True
 
-@router.get("/{category_id}",status_code=status.HTTP_200_OK)
+@router.get('/',status_code=status.HTTP_200_OK,response_model=List[ItemResponse])
+async def read_all_items(db:db_dependency):
+    items = db.query(Item).all()
+    if items is not None:
+        return  items
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+@router.get("/{category_id}",status_code=status.HTTP_200_OK,response_model=List[ItemResponse])
 async def read_items(db:db_dependency, category_id:int=Path(gt=0)):
     items=db.query(Item).filter(Item.category_id==category_id).all()
-    for i in items:
-        print (i.options)
     if items is not None:
-       return  items
+       return items
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
 @router.post("/",status_code=status.HTTP_201_CREATED)
@@ -72,11 +89,16 @@ async def update_item(db:db_dependency, item_request:ItemRequest,item_id:int=Pat
     db.commit()
     return item
 
-@router.delete('/{item_id}',status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{item_id}',status_code=status.HTTP_200_OK)
 async def delete_item(db:db_dependency,item_id:int=Path(gt=0)):
-    item=db.query(Item).filter(Item.id==item_id).first()
-    if item is None:
+    item_to_delete=db.query(Item).filter(Item.id==item_id).first()
+    if item_to_delete:
+        # Delete associated options
+        db.query(Option).filter(Option.item_id == item_id).delete()
+        db.delete(item_to_delete)
+        db.commit()
+        return {"message": "Item deleted successfully"}
+    else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    db.query(Item).filter(Item.id==item_id).delete()
-    db.commit()
+
     
